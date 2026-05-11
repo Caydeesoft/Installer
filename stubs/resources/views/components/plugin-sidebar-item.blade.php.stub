@@ -1,0 +1,28 @@
+<li>
+    @php
+        $href = '#';
+        if (!empty($item['route'])) {
+            $href = route($item['route']);
+        } elseif (!empty($item['url'])) {
+            $href = $item['url'];
+        }
+    @endphp
+
+    @if(!empty($item['children']))
+        <a href="{{ $href }}">
+            @if(!empty($item['icon']))<i class="{{ $item['icon'] }}"></i>@endif
+            {{ $item['title'] }}
+            <span class="bi bi-chevron-down"></span>
+        </a>
+        <ul class="nav child_menu">
+            @foreach($item['children'] as $child)
+                @include('components.plugin-sidebar-item', ['item' => $child])
+            @endforeach
+        </ul>
+    @else
+        <a href="{{ $href }}">
+            @if(!empty($item['icon']))<i class="{{ $item['icon'] }}"></i>@endif
+            {{ $item['title'] }}
+        </a>
+    @endif
+</li>

@@ -1,0 +1,21 @@
+<?php
+
+use App\Http\Controllers\PluginInstallerController;
+use Illuminate\Support\Facades\Route;
+
+
+
+Auth::routes();
+
+if (class_exists(\App\Http\Controllers\HomeController::class)) {
+    Route::get('/home', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
+}
+
+Route::middleware('auth')->prefix('plugins')->name('plugins.')->group(function (): void {
+    Route::get('/', [PluginInstallerController::class, 'index'])->name('index');
+    Route::post('/install', [PluginInstallerController::class, 'install'])->name('install');
+    Route::post('/enable', [PluginInstallerController::class, 'enable'])->name('enable');
+    Route::post('/disable', [PluginInstallerController::class, 'disable'])->name('disable');
+});
+
+require __DIR__ . '/installer.php';

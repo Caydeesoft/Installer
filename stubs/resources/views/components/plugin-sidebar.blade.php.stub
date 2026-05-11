@@ -1,0 +1,11 @@
+@php
+    $items = app(\App\Core\Menu\MenuManager::class)->get($location ?? 'sidebar');
+@endphp
+
+@if(!empty($items))
+    <ul class="nav side-menu">
+        @foreach($items as $item)
+            @include('components.plugin-sidebar-item', ['item' => $item])
+        @endforeach
+    </ul>
+@endif

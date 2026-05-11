@@ -1,0 +1,60 @@
+<?php
+
+namespace App\Providers;
+
+use App\Core\Menu\MenuManager;
+use App\Core\Plugins\PluginManager;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->app->singleton(MenuManager::class, static fn (): MenuManager => new MenuManager());
+    }
+
+    public function boot(): void
+    {
+        $manager = app(PluginManager::class);
+        $menuManager = app(MenuManager::class);
+
+        foreach ($manager->allEnabled() as $plugin) {
+            $provider = (string)($plugin['provider'] ?? '');
+
+            if (isset($plugin['menu']) && is_array($plugin['menu'])) {
+                $menuLocation = (string)($plugin['menu']['location'] ?? 'sidebar');
+                $menuManager->register($menuLocation, $plugin['menu']);
+            }
+
+            if (isset($plugin['menus']) && is_array($plugin['menus'])) {
+                foreach ($plugin['menus'] as $menu) {
+                    if (!is_array($menu)) {
+                        continue;
+                    }
+
+                    $menuLocation = (string)($menu['location'] ?? 'sidebar');
+                    $menuManager->register($menuLocation, $menu);
+                }
+            }
+
+            if ($provider === '' || !class_exists($provider)) {
+                continue;
+            }
+
+            if (!$manager->isLicensed($plugin)) {
+                continue;
+            }
+
+            try {
+                app()->register($provider);
+            } catch (\Throwable $e) {
+                Log::warning('Plugin provider registration failed.', [
+                    'plugin' => $plugin['name'] ?? $plugin['directory'] ?? 'unknown',
+                    'provider' => $provider,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+}

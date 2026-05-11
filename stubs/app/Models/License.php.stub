@@ -1,0 +1,22 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class License extends Model
+{
+    protected $fillable = [
+        'plugin_name',
+        'plugin_version',
+        'plugin_license',
+        'status',
+        'expires_at',
+        'licenseable_type',
+        'licenseable_id',
+    ];
+
+    protected $casts = [
+        'expires_at' => 'datetime',
+    ];
+}

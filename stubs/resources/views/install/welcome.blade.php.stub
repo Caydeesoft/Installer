@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Install Application</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f5f7fb; margin: 0; }
+        .wrap { max-width: 860px; margin: 40px auto; padding: 0 16px; }
+        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 18px; }
+        .card h2 { margin: 0; padding: 16px 18px; border-bottom: 1px solid #edf2f7; font-size: 18px; }
+        .card .body { padding: 16px 18px; }
+        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        label { display: block; font-size: 13px; color: #334155; margin-bottom: 4px; }
+        input, select { width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; box-sizing: border-box; }
+        .btn { border: 0; border-radius: 7px; padding: 10px 14px; background: #0f172a; color: #fff; cursor: pointer; }
+        .ok { color: #166534; font-size: 13px; margin-top: 8px; }
+        .err { color: #b91c1c; font-size: 13px; margin-bottom: 10px; }
+        .status { background: #ecfeff; border: 1px solid #a5f3fc; color: #0c4a6e; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <h1>Application Installer</h1>
+
+    @if(session('status'))
+        <div class="status">{{ session('status') }}</div>
+    @endif
+
+    @if($errors->any())
+        <div class="card">
+            <div class="body">
+                @foreach($errors->all() as $error)
+                    <div class="err">{{ $error }}</div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
+    <div class="card">
+        <h2>1. Database Configuration</h2>
+        <div class="body">
+            <form method="POST" action="{{ route('install.database') }}">
+                @csrf
+                <div class="grid">
+                    <div>
+                        <label>Connection</label>
+                        <select name="db_connection">
+                            <option value="mysql" @selected(old('db_connection', 'mysql') === 'mysql')>mysql</option>
+                            <option value="pgsql" @selected(old('db_connection') === 'pgsql')>pgsql</option>
+                            <option value="sqlite" @selected(old('db_connection') === 'sqlite')>sqlite</option>
+                            <option value="sqlsrv" @selected(old('db_connection') === 'sqlsrv')>sqlsrv</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Host</label>
+                        <input name="db_host" value="{{ old('db_host', '127.0.0.1') }}">
+                    </div>
+                    <div>
+                        <label>Port</label>
+                        <input name="db_port" type="number" value="{{ old('db_port', 3306) }}">
+                    </div>
+                    <div>
+                        <label>Database</label>
+                        <input name="db_database" value="{{ old('db_database') }}">
+                    </div>
+                    <div>
+                        <label>Username</label>
+                        <input name="db_username" value="{{ old('db_username') }}">
+                    </div>
+                    <div>
+                        <label>Password</label>
+                        <input name="db_password" type="password" value="{{ old('db_password') }}">
+                    </div>
+                </div>
+                <div style="margin-top: 12px;">
+                    <button class="btn" type="submit">Save Database & Test Connection</button>
+                </div>
+                @if($databaseConfigured)
+                    <div class="ok">Database configuration completed.</div>
+                @endif
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>2. Super Admin Account</h2>
+        <div class="body">
+            <form method="POST" action="{{ route('install.admin') }}">
+                @csrf
+                <div class="grid">
+                    <div>
+                        <label>Name</label>
+                        <input name="name" value="{{ old('name') }}">
+                    </div>
+                    <div>
+                        <label>Email</label>
+                        <input name="email" type="email" value="{{ old('email') }}">
+                    </div>
+                    <div>
+                        <label>Password</label>
+                        <input name="password" type="password">
+                    </div>
+                    <div>
+                        <label>Confirm Password</label>
+                        <input name="password_confirmation" type="password">
+                    </div>
+                </div>
+                <div style="margin-top: 12px;">
+                    <button class="btn" type="submit">Create Super Admin</button>
+                </div>
+                @if($adminConfigured)
+                    <div class="ok">Super admin account created.</div>
+                @endif
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>3. Finish Installation</h2>
+        <div class="body">
+            <form method="POST" action="{{ route('install.finish') }}">
+                @csrf
+                <button class="btn" type="submit">Finish & Lock Installer</button>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

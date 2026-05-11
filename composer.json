@@ -1,0 +1,25 @@
+{
+  "name": "caydeesoft/installer",
+  "description": "WordPress-style installer and plugin installer feature pack for Laravel",
+  "type": "library",
+  "license": "proprietary",
+  "require": {
+    "php": "^8.2",
+    "illuminate/support": "^12.0",
+    "illuminate/filesystem": "^12.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Caydeesoft\\Installer\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Caydeesoft\\Installer\\InstallerServiceProvider"
+      ]
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

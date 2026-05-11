@@ -1,0 +1,95 @@
+<?php
+
+    namespace App\Http\Controllers;
+
+    use App\Core\Plugins\PluginManager;
+    use Illuminate\Http\JsonResponse;
+    use Illuminate\Http\Request;
+    use Illuminate\Validation\ValidationException;
+    use InvalidArgumentException;
+    use RuntimeException;
+
+    class PluginInstallerController extends Controller
+        {
+            public function index(PluginManager $manager)
+            : JsonResponse
+                {
+                    return response()->json([
+                                                'data' => $manager->all(),
+                                            ]);
+                }
+
+            public function install(Request $request, PluginManager $manager)
+            : JsonResponse
+                {
+                    $pluginName = $this->validatedPluginName($request);
+
+                    try
+                        {
+                            $manager->install($pluginName);
+                        }
+                    catch (InvalidArgumentException|RuntimeException $e)
+                        {
+                            return response()->json(['message' => $e->getMessage()], 422);
+                        }
+
+                    return response()->json([
+                                                'message' => "Plugin [{$pluginName}] installed.",
+                                            ]);
+                }
+
+            public function enable(Request $request, PluginManager $manager)
+            : JsonResponse
+                {
+                    $pluginName = $this->validatedPluginName($request);
+
+                    try
+                        {
+                            $manager->enable($pluginName);
+                        }
+                    catch (InvalidArgumentException|RuntimeException $e)
+                        {
+                            return response()->json(['message' => $e->getMessage()], 422);
+                        }
+
+                    return response()->json([
+                                                'message' => "Plugin [{$pluginName}] enabled.",
+                                            ]);
+                }
+
+            public function disable(Request $request, PluginManager $manager)
+            : JsonResponse
+                {
+                    $pluginName = $this->validatedPluginName($request);
+
+                    try
+                        {
+                            $manager->disable($pluginName);
+                        }
+                    catch (InvalidArgumentException|RuntimeException $e)
+                        {
+                            return response()->json(['message' => $e->getMessage()], 422);
+                        }
+
+                    return response()->json([
+                                                'message' => "Plugin [{$pluginName}] disabled.",
+                                            ]);
+                }
+
+            protected function validatedPluginName(Request $request)
+            : string
+                {
+                    try
+                        {
+                            $validated = $request->validate([
+                                                                'plugin' => ['required', 'string', 'max:190'],
+                                                            ]);
+                        }
+                    catch (ValidationException $e)
+                        {
+                            throw new InvalidArgumentException('A valid plugin name is required.');
+                        }
+
+                    return $validated['plugin'];
+                }
+        }

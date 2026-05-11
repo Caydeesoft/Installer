@@ -1,0 +1,247 @@
+<?php
+
+namespace App\Core\Plugins;
+
+use App\Models\License;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
+use RuntimeException;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Throwable;
+
+class PluginManager
+{
+    protected string $pluginPath = 'plugins';
+
+    public function all(): array
+    {
+        $plugins = [];
+
+        foreach (File::directories(base_path($this->pluginPath)) as $dirPath) {
+            $jsonPath = $dirPath . '/plugin.json';
+            if (!File::exists($jsonPath)) {
+                continue;
+            }
+
+            $data = $this->decodePluginJson($jsonPath);
+            if ($data === null) {
+                continue;
+            }
+
+            $plugins[] = $this->normalizePluginData($data, basename($dirPath));
+        }
+
+        return $plugins;
+    }
+
+    public function allEnabled(): array
+    {
+        return array_values(array_filter($this->all(), static fn (array $plugin): bool => ($plugin['enabled'] ?? false) === true));
+    }
+
+    public function install(string $pluginName): void
+    {
+        $plugin = $this->getPlugin($pluginName);
+
+        if (($plugin['enabled'] ?? false) === true) {
+            return;
+        }
+
+        $installerClass = $plugin['install'] ?? null;
+
+        // Run installer first; only mark enabled if installation succeeds.
+        if (is_string($installerClass) && $installerClass !== '') {
+            if (!class_exists($installerClass)) {
+                throw new RuntimeException("Installer class [{$installerClass}] not found for plugin [{$pluginName}].");
+            }
+
+            $installer = app($installerClass);
+            if (!method_exists($installer, 'run')) {
+                throw new RuntimeException("Installer class [{$installerClass}] must implement run().");
+            }
+
+            $installer->run();
+        }
+
+        $this->enable($pluginName);
+    }
+
+    public function enable(string $pluginName): void
+    {
+        $plugin = $this->getPlugin($pluginName);
+        $plugin['enabled'] = true;
+
+        $this->savePluginJson($pluginName, $plugin);
+        $this->syncPluginPermissions($plugin);
+    }
+
+    public function disable(string $pluginName): void
+    {
+        $plugin = $this->getPlugin($pluginName);
+        $plugin['enabled'] = false;
+
+        $this->savePluginJson($pluginName, $plugin);
+    }
+
+    public function isLicensed(array $plugin): bool
+    {
+        $requiresLicense = (bool)($plugin['requires_license'] ?? $plugin['license_required'] ?? false);
+        if (!$requiresLicense) {
+            return true;
+        }
+
+        if (!Schema::hasTable('licenses')) {
+            return false;
+        }
+
+        $pluginName = (string)($plugin['name'] ?? $plugin['directory'] ?? '');
+        if ($pluginName === '') {
+            return false;
+        }
+
+        try {
+            $license = License::query()
+                ->where('plugin_name', $pluginName)
+                ->where('status', 'active')
+                ->first();
+        } catch (Throwable) {
+            return false;
+        }
+
+        return $license !== null && $license->expires_at !== null && $license->expires_at->isFuture();
+    }
+
+    protected function getPlugin(string $pluginName): array
+    {
+        $pluginName = $this->normalizePluginName($pluginName);
+        $jsonPath = base_path("{$this->pluginPath}/{$pluginName}/plugin.json");
+
+        if (!File::exists($jsonPath)) {
+            throw new InvalidArgumentException("Plugin [{$pluginName}] does not exist.");
+        }
+
+        $plugin = $this->decodePluginJson($jsonPath);
+        if ($plugin === null) {
+            throw new RuntimeException("Plugin [{$pluginName}] has an invalid plugin.json.");
+        }
+
+        return $this->normalizePluginData($plugin, $pluginName);
+    }
+
+    protected function savePluginJson(string $pluginName, array $data): void
+    {
+        $pluginName = $this->normalizePluginName($pluginName);
+        $path = base_path("{$this->pluginPath}/{$pluginName}/plugin.json");
+
+        unset($data['directory']);
+        File::put($path, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+    }
+
+    protected function normalizePluginName(string $pluginName): string
+    {
+        $pluginName = trim($pluginName);
+        if (!preg_match('/^[A-Za-z0-9._-]+$/', $pluginName)) {
+            throw new InvalidArgumentException("Invalid plugin name [{$pluginName}].");
+        }
+
+        return $pluginName;
+    }
+
+    protected function decodePluginJson(string $path): ?array
+    {
+        try {
+            $data = json_decode(File::get($path), true, 512, JSON_THROW_ON_ERROR);
+            return is_array($data) ? $data : null;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    protected function normalizePluginData(array $data, string $directory): array
+    {
+        $data['directory'] = $directory;
+        $data['name'] = (string)($data['name'] ?? $directory);
+        $data['enabled'] = (bool)($data['enabled'] ?? false);
+        $data['provider'] = (string)($data['provider'] ?? '');
+
+        return $data;
+    }
+
+    protected function syncPluginPermissions(array $plugin): void
+    {
+        if (!class_exists(Permission::class) || !class_exists(Role::class)) {
+            return;
+        }
+
+        if (!Schema::hasTable('permissions') || !Schema::hasTable('roles') || !Schema::hasTable('role_has_permissions')) {
+            return;
+        }
+
+        $permissions = $this->collectDeclaredPermissions($plugin);
+        if ($permissions === []) {
+            return;
+        }
+
+        $guard = (string)($plugin['guard_name'] ?? 'web');
+        $roleName = (string)($plugin['super_admin_role'] ?? 'super-admin');
+
+        try {
+            $role = Role::findOrCreate($roleName, $guard);
+        } catch (Throwable) {
+            return;
+        }
+
+        foreach ($permissions as $permissionName) {
+            try {
+                $permission = Permission::findOrCreate($permissionName, $guard);
+                $role->givePermissionTo($permission);
+            } catch (Throwable) {
+                // Keep install/enable resilient; ignore single permission failures.
+                continue;
+            }
+        }
+    }
+
+    protected function collectDeclaredPermissions(array $plugin): array
+    {
+        $permissions = [];
+
+        foreach (($plugin['permissions'] ?? []) as $permission) {
+            if (is_string($permission) && $permission !== '') {
+                $permissions[] = $permission;
+            }
+        }
+
+        foreach (($plugin['menu']['children'] ?? []) as $child) {
+            $this->extractMenuPermissions($permissions, $child);
+        }
+
+        if (isset($plugin['menu'])) {
+            $this->extractMenuPermissions($permissions, $plugin['menu']);
+        }
+
+        foreach (($plugin['menus'] ?? []) as $menu) {
+            $this->extractMenuPermissions($permissions, $menu);
+        }
+
+        return array_values(array_unique($permissions));
+    }
+
+    protected function extractMenuPermissions(array &$permissions, mixed $item): void
+    {
+        if (!is_array($item)) {
+            return;
+        }
+
+        $can = $item['can'] ?? null;
+        if (is_string($can) && $can !== '') {
+            $permissions[] = $can;
+        }
+
+        foreach (($item['children'] ?? []) as $child) {
+            $this->extractMenuPermissions($permissions, $child);
+        }
+    }
+}
