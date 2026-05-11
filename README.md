@@ -34,7 +34,38 @@ For Laravel applications, the package will automatically discover its service pr
 
 ## Usage
 
-[// TODO: Add detailed usage instructions here, including how to configure and use the installer and plugin features.]
+### Installing Features
+
+This package provides an Artisan command to install the necessary files and configurations into your Laravel application.
+
+To install the features, run the following command:
+
+```bash
+php artisan installer-features:install
+```
+
+If you need to overwrite existing files, you can use the `--force` option:
+
+```bash
+php artisan installer-features:install --force
+```
+
+After running the install command, you should perform the following steps:
+
+1.  **Dump Autoload:**
+    ```bash
+    composer dump-autoload
+    ```
+2.  **Run Migrations:**
+    ```bash
+    php artisan migrate
+    ```
+3.  **Clear Optimization Cache:**
+    ```bash
+    php artisan optimize:clear
+    ```
+
+[// TODO: Add more detailed usage instructions for the installed features, such as how to create and manage plugins, once the stubs are clearer.]
 
 ## Contributing
 
