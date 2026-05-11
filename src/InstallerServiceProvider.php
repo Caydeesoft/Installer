@@ -1,8 +1,8 @@
 <?php
 
-namespace Caydeesoft\InstallerFeatures;
+namespace Caydeesoft\Installer;
 
-use Caydeesoft\InstallerFeatures\Commands\InstallFeaturesCommand;
+use Caydeesoft\Installer\Commands\InstallFeaturesCommand;
 use Illuminate\Support\ServiceProvider;
 
 class InstallerServiceProvider extends ServiceProvider

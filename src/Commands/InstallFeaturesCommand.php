@@ -1,6 +1,6 @@
 <?php
 	
-	namespace Caydeesoft\InstallerFeatures\Commands;
+	namespace Caydeesoft\Installer\Commands;
 	
 	use Illuminate\Console\Command;
 	use Illuminate\Filesystem\Filesystem;
